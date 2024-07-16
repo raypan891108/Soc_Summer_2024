@@ -3,22 +3,22 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # 导入 3D 绘图工具
 from colour.models import Lab_to_XYZ, XYZ_to_sRGB, XYZ_to_Oklab
 
-def sRGB_to_linear(srgb):
-    threshold = 0.04045
-    below_threshold = srgb <= threshold
-    above_threshold = srgb > threshold
-    linear_rgb = np.zeros_like(srgb)
-    linear_rgb[below_threshold] = srgb[below_threshold] / 12.92
-    linear_rgb[above_threshold] = ((srgb[above_threshold] + 0.055) / 1.055) ** 2.4
-    return linear_rgb
+# def sRGB_to_linear(srgb):
+#     threshold = 0.04045
+#     below_threshold = srgb <= threshold
+#     above_threshold = srgb > threshold
+#     linear_rgb = np.zeros_like(srgb)
+#     linear_rgb[below_threshold] = srgb[below_threshold] / 12.92
+#     linear_rgb[above_threshold] = ((srgb[above_threshold] + 0.055) / 1.055) ** 2.4
+#     return linear_rgb
 
-def linear_to_srgb(linear_rgb):
-    srgb = np.where(
-        linear_rgb <= 0.0031308,
-        12.92 * linear_rgb,
-        1.055 * (linear_rgb ** (1 / 2.4)) - 0.055
-    )
-    return srgb
+# def linear_to_srgb(linear_rgb):
+#     srgb = np.where(
+#         linear_rgb <= 0.0031308,
+#         12.92 * linear_rgb,
+#         1.055 * (linear_rgb ** (1 / 2.4)) - 0.055
+#     )
+#     return srgb
 
 # 定义 Lab 色值
 lab_values = np.array([
@@ -30,11 +30,20 @@ lab_values = np.array([
     [26.9, 8.9, -22.9],
     [66.7, -1.3, 1.3]
 ])
-
+# D65 is X: 0.95047, Y: 1.00000, Z: 1.08883
+N_values = np.array([0.95047/0.34065467,1.0/0.36236193, 1.08883/ 0.38393722])
+# print(N_values)
 # 转换到 sRGB 并转换到线性 RGB
 XYZ_values = Lab_to_XYZ(lab_values)
-test = XYZ_values
-print(test)
+normalized_XYZ_values = []
+for value in XYZ_values:
+    normalized_XYZ_values.append(value * N_values)
+
+normalized_XYZ_values = np.array(normalized_XYZ_values)
+print(normalized_XYZ_values)
+
+test = normalized_XYZ_values
+
 
 # 定义多个独立的 test[1] 组
 test_1_sets = np.array([
@@ -63,12 +72,13 @@ ax = fig.add_subplot(111, projection='3d')
 # 绘制 lab_values 的插值结果
 for test_1 in test_1_sets:
     data_array = np.vstack((test[0], test_1, test[6]))
-    data_array = interpolate_points(data_array, 100)
+    data_array = interpolate_points(data_array, 50)
     
     # 将插值后的数据点添加到列表中
     interpolated_points.append(data_array)
 
     result_color = XYZ_to_sRGB(data_array)
+    result_color = np.clip(result_color, 0, 1)
     result = XYZ_to_Oklab(data_array)
 
     # 提取分量
@@ -81,12 +91,13 @@ for test_1 in test_1_sets:
 for i in range(len(interpolated_points[0])):
     data_array = np.vstack((interpolated_points[0][i], interpolated_points[1][i], interpolated_points[2][i],
                             interpolated_points[3][i], interpolated_points[4][i], interpolated_points[0][i]))
-    data_array = interpolate_points(data_array, 100)
+    data_array = interpolate_points(data_array, 50)
 
      # 将插值后的数据点添加到列表中
     interpolated_points.append(data_array)
 
     result_color = XYZ_to_sRGB(data_array)
+    result_color = np.clip(result_color, 0, 1)
     result = XYZ_to_Oklab(data_array)
 
     # 提取分量
