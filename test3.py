@@ -1,24 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # 导入 3D 绘图工具
-from colour.models import Lab_to_XYZ, XYZ_to_sRGB, XYZ_to_Oklab
+from colour.models import Lab_to_XYZ, XYZ_to_sRGB, XYZ_to_Oklab, Oklab_to_XYZ, sRGB_to_XYZ
+import math
 
-# def sRGB_to_linear(srgb):
-#     threshold = 0.04045
-#     below_threshold = srgb <= threshold
-#     above_threshold = srgb > threshold
-#     linear_rgb = np.zeros_like(srgb)
-#     linear_rgb[below_threshold] = srgb[below_threshold] / 12.92
-#     linear_rgb[above_threshold] = ((srgb[above_threshold] + 0.055) / 1.055) ** 2.4
-#     return linear_rgb
-
-# def linear_to_srgb(linear_rgb):
-#     srgb = np.where(
-#         linear_rgb <= 0.0031308,
-#         12.92 * linear_rgb,
-#         1.055 * (linear_rgb ** (1 / 2.4)) - 0.055
-#     )
-#     return srgb
 
 # 定义 Lab 色值
 lab_values = np.array([
@@ -30,6 +15,8 @@ lab_values = np.array([
     [26.9, 8.9, -22.9],
     [66.7, -1.3, 1.3]
 ])
+
+#白點對齊
 # D65 is X: 0.95047, Y: 1.00000, Z: 1.08883
 N_values = np.array([0.95047/0.34065467,1.0/0.36236193, 1.08883/ 0.38393722])
 # print(N_values)
@@ -40,9 +27,50 @@ for value in XYZ_values:
     normalized_XYZ_values.append(value * N_values)
 
 normalized_XYZ_values = np.array(normalized_XYZ_values)
-print(normalized_XYZ_values)
+# print(normalized_XYZ_values)
 
 test = normalized_XYZ_values
+
+OkLab_values = XYZ_to_Oklab(normalized_XYZ_values)
+#ACeP white - black
+v1 = OkLab_values[6] - OkLab_values[0]
+xyz_white_point = XYZ_to_Oklab(sRGB_to_XYZ(np.array([1.0, 1.0, 1.0])))
+xyz_black_point = XYZ_to_Oklab(sRGB_to_XYZ(np.array([0, 0, 0])))
+v2 = xyz_white_point - xyz_black_point
+def lenV(value):
+    result = (value[0] ** 2) + (value[1] ** 2) + (value[2] ** 2)
+    result = math.sqrt(result)
+    return result
+
+#內積
+dot_product = np.dot(v1, v2)
+print(dot_product)
+dot_product = np.arccos(dot_product)
+print(dot_product)
+dot_product = dot_product / (lenV(v1) * lenV(v2))
+print(dot_product)
+angle_degrees = math.degrees(dot_product) 
+#外積
+cross_product = np.cross(v1, v2) / lenV(np.cross(v1, v2))
+
+print('angle_degrees:', angle_degrees, 'cross_product:', cross_product)
+As = np.array([[0, -cross_product[2], cross_product[1]],
+               [cross_product[2], 0, -cross_product[0]],
+               [-cross_product[1], cross_product[0], 0]])
+identity_matrix = np.eye(3)
+
+#旋轉矩陣
+R = identity_matrix + (math.sin(angle_degrees) * As) + (1 - math.cos(angle_degrees)) * (As * As)
+# print('R:', R)
+NAA_value = []
+for value in OkLab_values[0:6]:
+    v = OkLab_values[6] - value
+    newPoint = np.dot(R, v)
+    NAA_value.append(newPoint)
+NAA_value.append(OkLab_values[6])
+NAA_value = np.array(NAA_value)
+
+test = Oklab_to_XYZ(NAA_value)
 
 
 # 定义多个独立的 test[1] 组
@@ -72,7 +100,7 @@ ax = fig.add_subplot(111, projection='3d')
 # 绘制 lab_values 的插值结果
 for test_1 in test_1_sets:
     data_array = np.vstack((test[0], test_1, test[6]))
-    data_array = interpolate_points(data_array, 20)
+    data_array = interpolate_points(data_array, 100)
     
     # 将插值后的数据点添加到列表中
     interpolated_points.append(data_array)
@@ -91,7 +119,7 @@ for test_1 in test_1_sets:
 for i in range(len(interpolated_points[0])):
     data_array = np.vstack((interpolated_points[0][i], interpolated_points[1][i], interpolated_points[2][i],
                             interpolated_points[3][i], interpolated_points[4][i], interpolated_points[0][i]))
-    data_array = interpolate_points(data_array, 20)
+    data_array = interpolate_points(data_array, 100)
 
      # 将插值后的数据点添加到列表中
     interpolated_points.append(data_array)
@@ -123,8 +151,8 @@ ax.set_title('Interpolated Points in 3D Space')
 
 plt.show()
 
-# 打印所有插值后的数据点
-for idx, points in enumerate(interpolated_points):
-    print(f"Set {idx + 1}:")
-    print(points)
-    print("=" * 20)
+# # 打印所有插值后的数据点
+# for idx, points in enumerate(interpolated_points):
+#     print(f"Set {idx + 1}:")
+#     print(points)
+#     print("=" * 20)
